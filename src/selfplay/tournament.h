@@ -106,6 +106,7 @@ class SelfPlayTournament {
   const size_t kParallelism;
   const bool kTraining;
   const float kResignPlaythrough;
+  std::unique_ptr<SyzygyTablebase> syzygy_tb_;
   const float kDiscardedStartChance;
 };
 

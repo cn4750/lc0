@@ -66,6 +66,11 @@ const OptionId kMoveThinkingId{"move-thinking", "MoveThinking",
 const OptionId kResignPlaythroughId{
     "resign-playthrough", "ResignPlaythrough",
     "The percentage of games which ignore resign."};
+const OptionId kSyzygyTablebaseId{
+    "syzygy-paths", "SyzygyPath",
+    "List of Syzygy tablebase directories, list entries separated by system "
+    "separator (\";\" for Windows, \":\" for Linux).",
+    's'};
 const OptionId kDiscardedStartChanceId{
     "discarded-start-chance", "DiscardedStartChance",
     "The percentage chance each game will attempt to start from a position "
@@ -101,6 +106,7 @@ void SelfPlayTournament::PopulateOptions(OptionsParser* options) {
   options->Add<BoolOption>(kVerboseThinkingId) = false;
   options->Add<BoolOption>(kMoveThinkingId) = false;
   options->Add<FloatOption>(kResignPlaythroughId, 0.0f, 100.0f) = 0.0f;
+  options->Add<StringOption>(kSyzygyTablebaseId);
   options->Add<FloatOption>(kDiscardedStartChanceId, 0.0f, 100.0f) = 0.0f;
   options->Add<StringOption>(kOpeningsFileId) = "";
   options->Add<BoolOption>(kOpeningsMirroredId) = false;
@@ -198,6 +204,17 @@ SelfPlayTournament::SelfPlayTournament(
       throw Exception(
           "Please define --visits, --playouts or --movetime, otherwise it's "
           "not clear when to stop search.");
+    }
+  }
+
+  // Take syzygy tablebases from options.
+  std::string tb_paths = options.Get<std::string>(kSyzygyTablebaseId);
+  if (!tb_paths.empty()) {
+    syzygy_tb_ = std::make_unique<SyzygyTablebase>();
+    CERR << "Loading Syzygy tablebases from " << tb_paths;
+    if (!syzygy_tb_->init(tb_paths)) {
+      CERR << "Failed to load Syzygy tablebases!";
+      syzygy_tb_ = nullptr;
     }
   }
 }
@@ -317,7 +334,7 @@ void SelfPlayTournament::PlayOneGame(int game_number) {
 
   // PLAY GAME!
   game.Play(kThreads[color_idx[0]], kThreads[color_idx[1]], kTraining,
-            enable_resign);
+            syzygy_tb_.get() , enable_resign);
 
   // If game was aborted, it's still undecided.
   if (game.GetGameResult() != GameResult::UNDECIDED) {
